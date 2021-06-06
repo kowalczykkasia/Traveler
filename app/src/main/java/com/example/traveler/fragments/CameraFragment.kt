@@ -2,6 +2,7 @@ package com.example.traveler.fragments
 
 import android.Manifest
 import android.Manifest.permission.CAMERA
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -13,6 +14,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.location.Geocoder
 import android.location.Location
+import android.location.LocationManager
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
@@ -28,6 +30,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.traveler.*
 import com.example.traveler.database.Shared
 import com.example.traveler.tools.DateFormatter
+import com.example.traveler.tools.MyReceiver
 import com.example.traveler.tools.NotificationService
 import com.example.traveler.viewModels.CameraViewModel
 import com.google.android.gms.location.Geofence
@@ -92,12 +95,47 @@ class CameraFragment : Fragment() {
                             lng = location?.longitude
                         )
                         savePhotoToDatabase(photoItem)
+                        registerGeoFenceWithLocation(photoItem)
                         Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
                         wasSaved = true
                     }
                 }
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerGeoFenceWithLocation(photoItemDto: PhotoItemDto) {
+        val geofencesList = mutableListOf<Geofence>()
+        val savedRadius = Shared.sharedPrefs?.getInt(DISTANCE, 1) ?: 1
+        val radius = savedRadius * 1000f
+            val loc = Location(LocationManager.GPS_PROVIDER)
+            photoItemDto.lat?.let { lat ->
+                photoItemDto.lng?.let { lon ->
+                    loc.latitude = lat
+                    loc.longitude = lon
+                    val geofence = Geofence.Builder()
+                        .setRequestId("${photoItemDto.id}")
+                        .setCircularRegion(lat, lon, radius)
+                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                        .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                        .build()
+                    geofencesList.add(geofence)
+                }
+            }
+            val request = GeofencingRequest.Builder().apply {
+                setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_EXIT)
+                addGeofences(geofencesList)
+            }.build()
+            val intent = Intent(context, MyReceiver::class.java)
+            intent.putExtra("id", "idGeo")
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        (activity as? MainActivity)?.geofencingClient?.addGeofences(request, pendingIntent)
     }
 
     private fun getAddress() {

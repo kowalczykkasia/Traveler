@@ -38,7 +38,7 @@ import kotlin.concurrent.thread
 class MainActivity : AppCompatActivity() {
 
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
-    private val geofencingClient by lazy { LocationServices.getGeofencingClient(this) }
+    val geofencingClient by lazy { LocationServices.getGeofencingClient(this) }
     private val fusedLocationClient: FusedLocationProviderClient by lazy {
         LocationServices.getFusedLocationProviderClient(applicationContext)
     }
@@ -66,7 +66,6 @@ class MainActivity : AppCompatActivity() {
             if (Shared.sharedPrefs?.getBoolean(NOTIFICATIONS, true) == true) {
                 listenerForLocationUpdates()
             } //todo else remove it
-            registerGeofence()
         }
     }
 
@@ -118,51 +117,6 @@ class MainActivity : AppCompatActivity() {
         //nothing to do
     }
 
-    @SuppressLint("MissingPermission")
-    private fun registerGeoFenceWithLocation(photoItemDtoList: List<PhotoItemDto>) {
-        val geofencesList = mutableListOf<Geofence>()
-        val savedRadius = Shared.sharedPrefs?.getInt(DISTANCE, 1) ?: 1
-        val radius = savedRadius * 1000f
-        photoItemDtoList.forEach { photoItemDto ->
-            val loc = Location(GPS_PROVIDER)
-            photoItemDto.lat?.let { lat ->
-                photoItemDto.lng?.let { lon ->
-                    loc.latitude = lat
-                    loc.longitude = lon
-                    val geofence = Geofence.Builder()
-                        .setRequestId("${photoItemDto.id}")
-                        .setCircularRegion(lat, lon, radius)
-                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                        .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
-                        .build()
-                    geofencesList.add(geofence)
-                }
-            }
-            val request = GeofencingRequest.Builder().apply {
-                setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_EXIT)
-                addGeofences(geofencesList)
-            }.build()
-            val intent = Intent(applicationContext, MyReceiver::class.java)
-            intent.putExtra("id", "idGeo")
-            val pendingIntent = PendingIntent.getBroadcast(
-                applicationContext,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            geofencingClient.addGeofences(request, pendingIntent)
-        }
-    }
-
-    private fun registerGeofence() {
-        thread {
-            Shared.repository?.getAllPhotos()?.let {
-                if (it.isNotEmpty())
-                    registerGeoFenceWithLocation(it)
-            }
-        }
-    }
-
     fun getRepository() = Shared.repository
 
     private fun hasPermissions(): Boolean =
@@ -180,7 +134,6 @@ class MainActivity : AppCompatActivity() {
     ) {
         if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             listenerForLocationUpdates()
-            registerGeofence()
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
