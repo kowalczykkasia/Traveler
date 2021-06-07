@@ -26,6 +26,7 @@ class MyReceiver : BroadcastReceiver() {
         }
         geofenvingEvent.triggeringGeofences.forEach {
             thread {
+                val all = Shared.repository?.getAllPhotos()
                 val photoItem = Shared.repository?.getPhotosById(it.requestId.toLong())
                 val bitmap = Shared.repository?.getPathForImage(photoItem?.id)
                 val intent = Intent(context, NotificationService::class.java)

@@ -23,7 +23,7 @@ class LibraryFragment : Fragment() {
         fun newInstance() = LibraryFragment()
     }
 
-    private lateinit var viewModel: LibraryViewModel
+    private var viewModel: LibraryViewModel? = null
 
     private val photosAdapter by lazy {
         PhotosAdapter {
@@ -51,7 +51,7 @@ class LibraryFragment : Fragment() {
         super.onActivityCreated(savedInstanceState)
         viewModel = ViewModelProvider(this).get(LibraryViewModel::class.java)
         with(viewModel){
-            photoListModel.observe(viewLifecycleOwner, Observer {
+            this?.photoListModel?.observe(viewLifecycleOwner, Observer {
                 refreshAdapter(it)
             })
         }
@@ -61,7 +61,7 @@ class LibraryFragment : Fragment() {
         thread {
             val photoList = (activity as? MainActivity)?.getRepository()?.getAllPhotos()
             val photoListModel = photoList?.map { Pair(it, Shared.repository?.getPathForImage(it.id)) }?.toMutableList()
-            viewModel.update(photoListModel)
+            viewModel?.update(photoListModel)
         }
     }
 

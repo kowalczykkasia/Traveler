@@ -9,7 +9,7 @@ import java.time.LocalDate
 @Entity(tableName = "PhotoItemDto")
 data class PhotoItemDto(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    var id: Long = 0,
     val description: String,
     val address: String?,
     val date: String?,

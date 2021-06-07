@@ -52,6 +52,7 @@ class CameraFragment : Fragment() {
     private var addresses: String? = null
     private var location: Location? = null
     private var wasSaved = false
+    private var photoItem: PhotoItemDto? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -71,6 +72,11 @@ class CameraFragment : Fragment() {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         viewModel = ViewModelProvider(this).get(CameraViewModel::class.java)
+        with(viewModel){
+            saved.observe(viewLifecycleOwner, androidx.lifecycle.Observer {
+                registerGeoFenceWithLocation(photoItem)
+            })
+        }
 
     }
 
@@ -87,15 +93,14 @@ class CameraFragment : Fragment() {
                     if (etDescription.text.toString().isBlank() || bitmap == null) {
                         Toast.makeText(context, "Description or photo is empty", Toast.LENGTH_SHORT).show()
                     } else {
-                        val photoItem = PhotoItemDto(
+                        photoItem = PhotoItemDto(
                             description = etDescription.text.toString(),
                             address = addresses ?: UNKNOWN_LOCATION,
                             date = date,
                             lat = location?.latitude,
                             lng = location?.longitude
                         )
-                        savePhotoToDatabase(photoItem)
-                        registerGeoFenceWithLocation(photoItem)
+                        photoItem?.let { savePhotoToDatabase(it) }
                         Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
                         wasSaved = true
                     }
@@ -105,12 +110,12 @@ class CameraFragment : Fragment() {
     }
 
     @SuppressLint("MissingPermission")
-    private fun registerGeoFenceWithLocation(photoItemDto: PhotoItemDto) {
+    private fun registerGeoFenceWithLocation(photoItemDto: PhotoItemDto?) {
         val geofencesList = mutableListOf<Geofence>()
         val savedRadius = Shared.sharedPrefs?.getInt(DISTANCE, 1) ?: 1
         val radius = savedRadius * 1000f
             val loc = Location(LocationManager.GPS_PROVIDER)
-            photoItemDto.lat?.let { lat ->
+            photoItemDto?.lat?.let { lat ->
                 photoItemDto.lng?.let { lon ->
                     loc.latitude = lat
                     loc.longitude = lon
@@ -124,7 +129,7 @@ class CameraFragment : Fragment() {
                 }
             }
             val request = GeofencingRequest.Builder().apply {
-                setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_EXIT)
+                setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
                 addGeofences(geofencesList)
             }.build()
             val intent = Intent(context, MyReceiver::class.java)
@@ -169,8 +174,10 @@ class CameraFragment : Fragment() {
 
     private fun savePhotoToDatabase(photoItemDto: PhotoItemDto) {
         thread {
-            val result =
-                (activity as? MainActivity)?.getRepository()?.savePhotoToDatabase(photoItemDto)
+            val result = (activity as? MainActivity)?.getRepository()?.savePhotoToDatabase(photoItemDto)
+            if (result != null) {
+                photoItemDto.id = result
+            }
             context?.let {
                 bitmap?.let { bitmap ->
                     viewModel.saveToInternalStorage(bitmap, it, result)
